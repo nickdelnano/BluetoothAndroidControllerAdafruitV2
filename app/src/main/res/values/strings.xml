@@ -1,0 +1,14 @@
+<resources>
+    <string name="app_name">ArduinoToAndroidCode</string>
+    <string name="action_settings">Settings</string>
+
+    <string name="connection_disconnected">Connection status: disconnected</string>
+    <string name="connection_connected">Connection status: connected</string>
+    <string name="connect">Connect to my Arduino</string>
+
+    <string name="vertical_bar_max">"30"</string>
+
+    //progress should be vertical_bar_max / 2
+    <string name="vertical_bar_progress">"15"</string>
+
+</resources>
