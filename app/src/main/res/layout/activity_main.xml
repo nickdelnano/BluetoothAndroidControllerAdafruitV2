@@ -6,7 +6,7 @@
     android:paddingLeft="@dimen/activity_horizontal_margin"
     android:paddingRight="@dimen/activity_horizontal_margin"
     android:paddingTop="@dimen/activity_vertical_margin"
-    tools:context=".Main" >
+    >
 
     <TextView
         android:id="@+id/connectedStatus"
@@ -76,5 +76,14 @@
         android:text="Stop Motors"
         android:layout_alignBottom="@+id/verticalSeekbarRight"
         android:layout_centerHorizontal="true" />
+
+    <EditText
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:id="@+id/deviceId"
+        android:layout_above="@+id/seekbarLeftNumber"
+        android:layout_marginBottom="42dp"
+        android:layout_alignEnd="@+id/seekbarRightNumber"
+        android:layout_alignStart="@+id/seekbarLeftNumber" />
 
 </RelativeLayout>

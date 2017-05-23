@@ -14,6 +14,7 @@ import android.util.Log;
 import android.view.View;
 import android.view.View.OnClickListener;
 import android.widget.Button;
+import android.widget.EditText;
 import android.widget.SeekBar;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -28,13 +29,15 @@ public class MainActivity extends Activity implements OnClickListener {
     private BluetoothSocket btSocket = null;
     private OutputStream outStream = null;
     private static final UUID MY_UUID = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB");
-    private static String address = "98:D3:31:80:7C:8B";
     private final static int REQUEST_ENABLE_BT = 1;
 
     @Bind(R.id.verticalSeekbarLeft)
     VerticalSeekBar mVerticalSeekbarLeft;
     @Bind(R.id.verticalSeekbarRight)
     VerticalSeekBar mVerticalSeekbarRight;
+
+    @Bind(R.id.deviceId)
+    EditText deviceId;
 
     @Bind(R.id.seekbarLeftNumber)
     TextView mLeftSliderText;
@@ -68,13 +71,22 @@ public class MainActivity extends Activity implements OnClickListener {
 
     @Override
     public void onClick(View control) {
-        switch (control.getId()) {
-            case R.id.connect:
-                Connect();
-                connectedStatus.setText(R.string.connection_connected);
-                break;
-            case R.id.stopMotors: {
-                writeData("stop x");
+        String id = deviceId.getText().toString();
+
+        // Only make BT connection if device id was entered
+        if (!id.equals("")) {
+        }
+
+        else {
+
+            switch (control.getId()) {
+                case R.id.connect:
+                    connect(id);
+                    connectedStatus.setText(R.string.connection_connected);
+                    break;
+                case R.id.stopMotors: {
+                    writeData("stop x");
+                }
             }
         }
     }
@@ -92,8 +104,8 @@ public class MainActivity extends Activity implements OnClickListener {
         }
     }
 
-    public void Connect() {
-        BluetoothDevice device = mBluetoothAdapter.getRemoteDevice(address);
+    public void connect(String id) {
+        BluetoothDevice device = mBluetoothAdapter.getRemoteDevice(id);
 
         mBluetoothAdapter.cancelDiscovery();
 
