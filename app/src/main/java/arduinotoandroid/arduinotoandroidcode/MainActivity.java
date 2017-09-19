@@ -22,6 +22,22 @@ import android.widget.Toast;
 import butterknife.Bind;
 import butterknife.ButterKnife;
 
+/**
+ * This Activity acts as a server for a bluetooth client and implements a text-based protocol
+ * to control two sets of two bidirectional motors. An arduino client controlling motors using
+ * the Adafruit Motor Shield V2 can be found at https://github.com/ndelnano/ArduinoBluetooth/blob/master/bluetooth.ino.
+ *
+ * The text based protocol is as follows:
+ *      'stop x' - stop all motors
+ *      'move {LEFT_DIRECTION}{LEFT_SPEED} {RIGHT_DIRECTION}{RIGHT_SPEED} x'
+ *          - Where *_DIRECTION are 0 or 1, and *_SPEED is in range [-255,255]
+ *              *_DIRECTION = 0 => forward, 1 => backwards
+ *
+ *
+ *  Ex: "move 0100 0100x" --sets both wheels forward at speed 100
+ *      "move 0255 1255x" --sets left wheel at max speed forward, right wheel at max speed backward
+ *              -- This will make your vehicle do an awesome donut!
+ */
 public class MainActivity extends Activity implements OnClickListener {
 
     private static final String TAG = "ArduinoToAndroid";
@@ -56,41 +72,63 @@ public class MainActivity extends Activity implements OnClickListener {
     int rightDirection;
     int leftDirection;
 
+    // Create a scale for the vertical sliders
+    // Since the Adafruit Motor Shield takes inputs between -255 < 0 < 255,
+    // Create a scale that corresponds to the number of distinct values returned by the VerticalSeekBar
+    // in activity_main.xml
+    // This functionality does not modify the values sent over the network, but ensures that
+    // only valid values in the range [-255,255] can be sent.
     int scale = 17;
     int numberOfNotches = 255 / scale;
-    //adafruit dc motors take speed inputs between -255 < 0 < 255
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+
+        // Bind views to activity instance variables
         ButterKnife.bind(this);
+
+        // Set button listeners
         setListeners();
+
+        // If bluetooth is not turned on, prompt user to turn it on
         CheckBtIsOn();
     }
 
+    /**
+     * Onclick functions for connect and stop motors buttons.
+     * @param control
+     */
     @Override
     public void onClick(View control) {
-        String id = deviceId.getText().toString();
+        switch (control.getId()) {
 
-        // Only make BT connection if device id was entered
-        if (!id.equals("")) {
-        }
-
-        else {
-
-            switch (control.getId()) {
-                case R.id.connect:
+            // Initiate bluetooth connection
+            case R.id.connect:
+                // Only make BT connection if device id was entered
+                String id = deviceId.getText().toString();
+                if (id.equals("")) {
+                    Toast.makeText(getApplicationContext(), "Enter the bluetooth receiver ID into the text field.",
+                            Toast.LENGTH_SHORT).show();
+                }
+                else {
                     connect(id);
-                    connectedStatus.setText(R.string.connection_connected);
-                    break;
+                }
+                break;
+
+                // Stop the motors
                 case R.id.stopMotors: {
+                    // Send stop message over bluetooth
                     writeData("stop x");
+                    break;
                 }
             }
-        }
     }
 
+    /**
+     * If bluetooth is not enabled on the users device, prompt them with a menu to enable it.
+     */
     private void CheckBtIsOn() {
         mBluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
 
@@ -98,36 +136,59 @@ public class MainActivity extends Activity implements OnClickListener {
             Toast.makeText(getApplicationContext(), "Bluetooth Disabled!",
                     Toast.LENGTH_SHORT).show();
 
-            //start activity to request bluetooth to be enabled
+            // Start activity to show bluetooth options
             Intent enableBtIntent = new Intent(mBluetoothAdapter.ACTION_REQUEST_ENABLE);
             startActivityForResult(enableBtIntent, REQUEST_ENABLE_BT);
         }
     }
 
+    /**
+     * Connect to the bluetooth device with id 'id'. Id must be a valid bluetooth address
+     * in the form "00:11:22:33:AA:BB".
+     * @param id
+     */
     public void connect(String id) {
-        BluetoothDevice device = mBluetoothAdapter.getRemoteDevice(id);
-
-        mBluetoothAdapter.cancelDiscovery();
-
+        // Android bluetooth API code
+        BluetoothDevice device = null;
         try {
-            btSocket = device.createRfcommSocketToServiceRecord(MY_UUID);
-            btSocket.connect();
-            Log.d(TAG, "Connection made.");
-        } catch (IOException e) {
+            device = mBluetoothAdapter.getRemoteDevice(id);
+            mBluetoothAdapter.cancelDiscovery();
+        }
+        catch (Exception e) {
+            // Show user error message
+            // i.e. "333 is not a valid bluetooth address"
+            Toast.makeText(getApplicationContext(), e.getMessage(),
+                    Toast.LENGTH_SHORT).show();
+        }
+
+        // If getRemoteDevice did not throw and device was set, connect to client
+        // getRemoteDevice throws if its parameter is not a valid bluetooth address
+        if (device != null) {
             try {
-                btSocket.close();
-            } catch (IOException e2) {
-                Log.d(TAG, "Unable to end the connection");
+                btSocket = device.createRfcommSocketToServiceRecord(MY_UUID);
+                btSocket.connect();
+                Toast.makeText(getApplicationContext(), "Connection made",
+                        Toast.LENGTH_SHORT).show();
+                connectedStatus.setText(R.string.connection_connected);
+            } catch (IOException e) {
+                try {
+                    btSocket.close();
+                } catch (IOException e2) {
+                    Log.d(TAG, "Unable to end the connection");
+                }
+                Log.d(TAG, "Socket creation failed");
             }
-            Log.d(TAG, "Socket creation failed");
         }
     }
 
+    /**
+     * Writes the string 'data' over the global bluetooth socket 'btSocket'
+     * @param data
+     */
     private void writeData(String data) {
         try {
             outStream = btSocket.getOutputStream();
         } catch (IOException e) {
-            Log.d(TAG, "Bug BEFORE Sending stuff", e);
         }
 
         String message = data;
@@ -136,19 +197,26 @@ public class MainActivity extends Activity implements OnClickListener {
         try {
             outStream.write(msgBuffer);
         } catch (IOException e) {
-            Log.d(TAG, "Bug while sending stuff", e);
         }
     }
 
+    /**
+     * Closes the global bluetooth socket 'btSocket'
+     */
     @Override
     protected void onDestroy() {
         super.onDestroy();
         try {
+            // Close bluetooth socket
             btSocket.close();
         } catch (IOException e) {
         }
     }
 
+    /**
+     * Set listeners for buttons -- 'connect', 'stop motors', left scrollbar, right scrollbar
+     * Implements text based protocol described at top of file
+     */
     public void setListeners()
     {
         connect.setOnClickListener(this);
@@ -166,20 +234,18 @@ public class MainActivity extends Activity implements OnClickListener {
 
             @Override
             public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
-                //convert
+                // Convert using scale
                 progress = progress - numberOfNotches;
                 progress = progress * scale;
 
-                //direction is sent as 0 for forward or 1 for backward
-                //default is forward
+                // Direction is sent as 0 for forward or 1 for backward
                 leftDirection = 0;
 
-                //if progress is negative, set direction to 1 and then take abs to avoid sending "-" over bluetooth
+                // If progress is negative, set direction to 1 and then take abs to avoid sending "-" over bluetooth
                 if (progress < 0) {
                     leftDirection = 1;
                     progress = Math.abs(progress);
                 }
-
 
                 speedHolder.setLeftSpeed("" + leftDirection + progress);
                 mLeftSliderText.setText(String.valueOf(progress));
@@ -201,20 +267,18 @@ public class MainActivity extends Activity implements OnClickListener {
 
             @Override
             public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
-                //convert
+                // Convert using scale
                 progress = progress - numberOfNotches;
                 progress = progress * scale;
 
-                //direction is sent as 0 for forward or 1 for backward
-                //default is forward
+                // Direction is sent as 0 for forward or 1 for backward
                 rightDirection = 0;
 
-                //if progress is negative, set direction to 1 and then take abs to avoid sending "-" over bluetooth
+                // If progress is negative, set direction to 1 and then take abs to avoid sending "-" over bluetooth
                 if (progress < 0) {
                     rightDirection = 1;
                     progress = Math.abs(progress);
                 }
-
 
                 speedHolder.setRightSpeed("" + rightDirection + progress);
                 mRightSliderText.setText(String.valueOf(progress));
