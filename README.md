@@ -1,3 +1,3 @@
 # Server for Bluetooth Arduino client
 
-# Licensing
+https://www.youtube.com/watch?v=SH9gwBo8HOU
